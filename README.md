@@ -1,5 +1,4 @@
-# Zanka Haber — n8n iş akışı
-# Zanka Haber | n8n X Otomatik Haber Botu
+# n8n X Otomatik Haber Botu
 
 RSS haberlerini, piyasa verilerini ve YouTube içeriklerini X üzerinde paylaşmak için hazırlanan **49 düğümlü n8n otomasyonu**.
 
@@ -45,20 +44,13 @@ Piyasa API'leri → Verileri birleştirme → Piyasa özeti
 | Google Sheets OAuth2 bağlantısı | Paylaşım geçmişini okuma ve kaydetme |
 | Google Sheets belgesi | Geçmiş kayıtlarını saklama |
 
-RSS haberleri, piyasa verileri ve YouTube içerikleri için hazırlanan v35 iş akışının paylaşım kopyasıdır.
 İş akışında n8n LangChain Agent ve Google Gemini düğümleri de kullanılır. İçe aktardıktan sonra eksik veya tanınmayan düğüm bulunmadığını kontrol edin.
 
+## Kurulum
 
-1. `zanka-haber-v35-public.json` dosyasını n8n içine aktarın.
-2. `@postpulse/n8n-nodes-postpulse` community node paketini kendi ortamınızda kurun.
-3. PostPulse, Google Sheets OAuth2 ve Google Gemini kimlik bilgilerini n8n içinde kendiniz oluşturup ilgili düğümlere bağlayın. Bu dosya kimlik bilgisi içermez.
-4. Google Sheets kullanan 5 düğümde `YOUR_GOOGLE_SHEET_ID` ve `YOUR_SHEET_NAME` alanlarını doldurun. Tablo sütunları: Hash, Baslik, Link, Kategori, Trend Skoru, Tweet Metni, Gorsel URL, Yayinlanma Tarihi.
-5. Dört yayın düğümündeki `YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID` alanını kendi PostPulse sosyal hesap kimliğinizle değiştirin.
-6. YouTube kaynaklarında `YOUR_YOUTUBE_HANDLE` ve `YOUR_YOUTUBE_CHANNEL_ID` alanlarını doldurun.
-7. Kurulumu kontrol ettikten sonra iş akışını etkinleştirin. Paylaşım kopyası pasif durumdadır.
 ### 1. İş akışını içe aktarın
 
-Bu depodaki [zanka-haber-v35-public.json](./zanka-haber-v35-public.json) dosyasını indirin ve n8n'in dosyadan içe aktarma seçeneğiyle açın. PostPulse community node paketini ortamınıza kurun.
+Bu depodaki [haber-botu-v35-public.json](./haber-botu-v35-public.json) dosyasını indirin ve n8n'in dosyadan içe aktarma seçeneğiyle açın. PostPulse community node paketini ortamınıza kurun.
 
 İş akışı paylaşım dosyasında **pasif** durumdadır.
 
@@ -94,3 +86,50 @@ Bu başlıkların her biri ayrı sütunda olmalıdır. Ardından aşağıdaki be
 | --- | --- |
 | `YOUR_GOOGLE_SHEET_ID` | Kendi Google Sheets belge kimliğiniz |
 | `YOUR_SHEET_NAME` | Çalışma sayfanızın adı |
+| `YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID` | PostPulse içindeki bağlı X hesabınızın kimliği |
+| `YOUR_YOUTUBE_HANDLE` | YouTube kanal kullanıcı adınız; başında `@` olmadan |
+| `YOUR_YOUTUBE_CHANNEL_ID` | YouTube kanal kimliğiniz |
+
+PostPulse sosyal hesap kimliğini şu dört yayın düğümünde doldurun:
+
+- `Publish Market Post`
+- `Publish YouTube Post`
+- `Publish Post1`
+- `Publish Post (text only)1`
+
+YouTube bilgilerini `YouTube Videos Page`, `YouTube Streams Page` ve `YouTube Channel Feed` düğümlerinde değiştirin.
+
+### 5. Metinleri ve zamanlamayı düzenleyin
+
+- `AI Agent1` içindeki editör talimatlarını kendi yayın dilinize ve markanıza uyarlayın.
+- `YouTube Duplicate Filter` kodundaki duyuru metinlerini kendi kanal adınıza göre değiştirin.
+- Kullanmak istediğiniz RSS kaynaklarını seçin; bazı kaynak düğümleri dosyada devre dışıdır.
+- `Google Trends TR RSS` düğümü dosyada devre dışıdır. Trend kaynağını kullanmak isterseniz adresini kontrol edip etkinleştirin.
+- İş akışının saat dilimini `Europe/Istanbul` olarak ayarlayın ve iki zamanlayıcının gerçek ayarlarını kontrol edin.
+
+**Zamanlama notu:** Piyasa düğümünün adında `08:00` yazmasına rağmen JSON içindeki `triggerAtHour` değeri `1` olarak kayıtlıdır. Haber zamanlayıcısı ise saat bazlıdır; düğüm notundaki 40 dakika ifadesiyle örtüşmez. İstediğiniz saat ve aralığı zamanlayıcıların ayarlarından belirleyin.
+
+### 6. Kontrol edip etkinleştirin
+
+Önce RSS okuma, Gemini çıktısı ve Sheets erişimini kontrol edin. Yayın düğümlerini çalıştırdığınızda bağlı X hesabına gerçek gönderi gönderilir. Çıktıları ve yayın hesabını kontrol ettikten sonra zamanlanmış çalışmayı etkinleştirin.
+
+## Özelleştirilebilir filtreler
+
+`Trend + Duplicate Filter` düğümündeki bazı başlangıç değerleri:
+
+| Ayar | Değer | Açıklama |
+| --- | --- | --- |
+| `MAX_NEWS_AGE_HOURS` | `24` | Haber yaşı üst sınırı, saat |
+| `MAX_SHEET_ROWS_TO_SCAN` | `350` | Geçmiş karşılaştırmasında taranan satır sınırı |
+| `NIGHT_START_HOUR` | `3` | Gece aralığının başlangıcı |
+| `NIGHT_END_HOUR` | `7` | Gece aralığının bitişi |
+| `NIGHT_MAX_NON_CRITICAL_POSTS` | `2` | Gece paylaşım filtresinin eşik değeri |
+| `IN_FLIGHT_LOCK_TTL_HOURS` | `12` | Geçici haber kilidinin geçerlilik süresi, saat |
+
+Kritik haber sınıflandırması kod içindeki anahtar kelime kurallarına dayanır. Bu kuralları, reklam filtrelerini ve benzerlik eşiklerini yayın politikanıza göre düzenleyebilirsiniz.
+
+## Paylaşım sürümü ve doğrulama
+
+Paylaşım dosyasından hesap bağlantılarının adları ve kimlikleri, özel Sheets adresleri, sosyal hesap kimlikleri, YouTube kanal bilgileri ve n8n ortam kimlikleri çıkarılmıştır. Kurulum alanlarında örnek değerler bulunur; herkese açık RSS ve piyasa API adresleri korunmuştur.
+
+JSON yapısı, 49 düğümün korunduğu, düğümler arasındaki bağlantıların ve JavaScript kodlarının değişmediği kontrol edilmiştir. Temizlenmiş kopya canlı servislerle n8n üzerinde çalıştırılmamıştır; kendi bağlantılarınızı ekledikten sonra ortamınızda doğrulayın.
