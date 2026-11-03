@@ -1,0 +1,1854 @@
+{
+  "name": "zanka haber - rss akilli gorsel oncelikli v35 cift paylasim kilidi fix",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "id": "e1b1d03b-ffbd-4fa1-9419-e7569fa769c2",
+      "name": "Daily Market Schedule 08:00 TR",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        15312
+      ],
+      "notes": "Europe/Istanbul timezone ile her gun 08:00 piyasa postu."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json || {});\nconst market = items.find(item => item.USD || item['gram-altin'] || item.gumus) || {};\nconst btc = items.find(item => item.bitcoin?.usd || item.price || item.symbol) || {};\n\nfunction parseTr(value) {\n  if (typeof value === 'number') return value;\n  const cleaned = String(value ?? '')\n    .replace(/\\$/g, '')\n    .replace(/\\s/g, '')\n    .replace(/\\./g, '')\n    .replace(',', '.');\n  const number = Number(cleaned);\n  return Number.isFinite(number) && number > 0 ? number : null;\n}\n\nfunction mid(row) {\n  if (!row) return null;\n  const buy = parseTr(row['Alış'] ?? row.Buying ?? row.buying);\n  const sell = parseTr(row['Satış'] ?? row.Selling ?? row.selling);\n  if (buy && sell) return (buy + sell) / 2;\n  return sell || buy || null;\n}\n\nconst usdTry = mid(market.USD);\nconst gramGoldTry = mid(market['gram-altin'] || market.GRA);\nconst gramSilverTry = mid(market.gumus || market.GUMUS);\nconst btcUsd = parseTr(btc.bitcoin?.usd ?? btc.price ?? btc.lastPrice);\n\nif (!usdTry || !gramGoldTry || !gramSilverTry || !btcUsd) {\n  throw new Error('Piyasa verisi eksik: USDTRY=' + usdTry + ', gramAltin=' + gramGoldTry + ', gramGumus=' + gramSilverTry + ', BTC=' + btcUsd);\n}\n\nfunction fmtTry(value, digits = 2) {\n  return Number(value).toLocaleString('tr-TR', { minimumFractionDigits: digits, maximumFractionDigits: digits });\n}\nfunction fmtUsd(value, digits = 0) {\n  return Number(value).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });\n}\n\nconst content = 'Piyasalarda sabah görünümü\\n\\n'\n  + 'Gram altın: ' + fmtTry(gramGoldTry) + ' TL\\n'\n  + 'Dolar/TL: ' + fmtTry(usdTry, 4) + '\\n'\n  + 'Gram gümüş: ' + fmtTry(gramSilverTry) + ' TL\\n'\n  + 'Bitcoin: ' + fmtUsd(btcUsd) + ' $';\n\nreturn [{\n  json: {\n    content,\n    hash: 'market-' + new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' }),\n    title: 'Piyasalarda sabah görünümü',\n    trendScore: '',\n    imageUrl: '',\n    pubDate: new Date().toISOString(),\n    link: 'market-prices'\n  }\n}];"
+      },
+      "id": "233b25a7-a737-443d-a794-a9f021a4086a",
+      "name": "Format Market Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        15312
+      ]
+    },
+    {
+      "parameters": {
+        "scheduleMode": "now",
+        "publications": {
+          "publication": [
+            {
+              "socialMediaAccountId": "YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID",
+              "platformSettings": "={{ JSON.stringify({ \"type\": \"TWITTER\" }) }}",
+              "posts": {
+                "post": [
+                  {
+                    "attachmentPaths": {
+                      "path": [
+                        {}
+                      ]
+                    },
+                    "content": "={{ $json.content }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "fbe92fb2-0dec-481f-9ef5-715774ac874a",
+      "name": "Publish Market Post",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        3520,
+        15312
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Hash": "={{ $node[\"Format Market Post\"].json.hash }}",
+            "Baslik": "={{ $node[\"Format Market Post\"].json.title }}",
+            "Link": "={{ $node[\"Format Market Post\"].json.link }}",
+            "Kategori": "Piyasa",
+            "Trend Skoru": "",
+            "Tweet Metni": "={{ $node[\"Format Market Post\"].json.content }}",
+            "Gorsel URL": "",
+            "Yayinlanma Tarihi": "={{ $node[\"Format Market Post\"].json.pubDate }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Hash",
+              "displayName": "Hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Baslik",
+              "displayName": "Baslik",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Trend Skoru",
+              "displayName": "Trend Skoru",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tweet Metni",
+              "displayName": "Tweet Metni",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Gorsel URL",
+              "displayName": "Gorsel URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Yayinlanma Tarihi",
+              "displayName": "Yayinlanma Tarihi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3728,
+        15312
+      ],
+      "id": "3ef7658c-cd85-4c33-835a-ff05475fadc2",
+      "name": "Log Market Post in sheet",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2192,
+        17440
+      ],
+      "id": "c48da4c4-8e14-495f-aa6d-fdbdcc64da2e",
+      "name": "Get published rows for YouTube",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "17e5b91d-1079-46be-8c76-3f28c4312604",
+      "name": "Merge YouTube + Sheet",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2784,
+        16784
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json || {});\nconst staticData = $getWorkflowStaticData('global');\nstaticData.youtubePublishedIds = Array.isArray(staticData.youtubePublishedIds) ? staticData.youtubePublishedIds : [];\n\nconst postedLinks = new Set();\nconst postedHashes = new Set();\nconst postedVideoIds = new Set(staticData.youtubePublishedIds.map(String));\nif (staticData.lastYouTubeVideoId) postedVideoIds.add(String(staticData.lastYouTubeVideoId));\n\nfunction decode(value) {\n  return String(value || '')\n    .replace(/\\\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))\n    .replace(/\\\\u0026/g, '&')\n    .replace(/\\\\u003d/g, '=')\n    .replace(/\\\\u002F/g, '/')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#34;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&apos;/g, \"'\")\n    .replace(/\\\\\"/g, '\"')\n    .trim();\n}\n\nfunction normalize(value) {\n  return decode(value)\n    .toLocaleLowerCase('tr-TR')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/\\u0131/g, 'i');\n}\n\nfunction videoIdFrom(value) {\n  const text = decode(value);\n  const patterns = [\n    /(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/|youtube\\.com\\/live\\/|youtube\\.com\\/embed\\/)([A-Za-z0-9_-]{11})/i,\n    /(?:videoId|video_id|yt:video)[:\"=\\s]+([A-Za-z0-9_-]{11})/i,\n    /^([A-Za-z0-9_-]{11})$/\n  ];\n  for (const regex of patterns) {\n    const match = text.match(regex);\n    if (match) return match[1];\n  }\n  return '';\n}\n\nfunction normalizeYoutubeLink(value) {\n  const id = videoIdFrom(value);\n  return id ? 'https://www.youtube.com/watch?v=' + id : decode(value).trim();\n}\n\nfor (const item of items) {\n  if (item.Link || item.Hash || item.Baslik || item['Tweet Metni']) {\n    const link = String(item.Link || item.link || '').trim();\n    const hash = String(item.Hash || item.hash || '').trim();\n    const tweet = String(item['Tweet Metni'] || item.content || '').trim();\n    if (link) {\n      const normalized = normalizeYoutubeLink(link);\n      postedLinks.add(normalized);\n      const id = videoIdFrom(normalized);\n      if (id) postedVideoIds.add(id);\n    }\n    if (hash) {\n      postedHashes.add(hash);\n      const hashId = hash.replace(/^youtube-/, '');\n      if (/^[A-Za-z0-9_-]{11}$/.test(hashId)) postedVideoIds.add(hashId);\n    }\n    const tweetId = videoIdFrom(tweet);\n    if (tweetId) postedVideoIds.add(tweetId);\n  }\n}\n\nfunction htmlFrom(item) {\n  const strings = [];\n  for (const value of Object.values(item || {})) {\n    if (typeof value === 'string' && value.length > 100) strings.push(value);\n  }\n  return strings.join('\\n');\n}\n\nfunction looksBadYoutubeTitle(title, context = '') {\n  const t = normalize(title);\n  const c = normalize(context);\n  if (!t || t.length < 8) return true;\n  const badPhrases = [\n    'bu kanala abone olmak istiyor musunuz',\n    'kanala abone olmak istiyor musunuz',\n    'abone olmak istiyor musunuz',\n    'abone ol',\n    'subscribe to this channel',\n    'want to subscribe',\n    'oturum ac',\n    'giris yap',\n    'bildirimleri ac',\n    'bildirim al',\n    'paylas',\n    'share',\n    'kaydet',\n    'save',\n    'daha sonra izle',\n    'watch later',\n    'siraya ekle',\n    'add to queue',\n    'tumunu oynat',\n    'play all'\n  ];\n  if (badPhrases.some(phrase => t.includes(phrase))) return true;\n  if (t.includes('abone') && c.includes('subscribebutton')) return true;\n  return false;\n}\n\nfunction looksShort(title, context = '') {\n  const text = normalize(title + ' ' + context);\n  return /#shorts|\\bshorts\\b|\\/shorts\\/|shortslockupviewmodel|reelwatchendpoint|\\bkisa video\\b/.test(text);\n}\n\nfunction looksLive(title, context = '', pageKind = '') {\n  const text = normalize(title + ' ' + context);\n  if (pageKind === 'stream') return true;\n  return /canli|live now|live broadcast|yayinda|yayini|upcomingeventdata|islivenow|premiere|prömiyer/.test(text);\n}\n\nfunction parseTime(value) {\n  const t = Date.parse(value || '');\n  return Number.isFinite(t) ? t : 0;\n}\n\nfunction extractVideosFromHtml(html, pageKind) {\n  const out = [];\n  const seen = new Set();\n  const text = String(html || '');\n  const patterns = [\n    /\"videoId\":\"([A-Za-z0-9_-]{11})\"[\\s\\S]{0,3600}?\"title\":\\{\"runs\":\\[\\{\"text\":\"([^\"]+)\"/g,\n    /\"videoId\":\"([A-Za-z0-9_-]{11})\"[\\s\\S]{0,3600}?\"title\":\\{\"simpleText\":\"([^\"]+)\"/g,\n    /\"url\":\"\\/watch\\?v=([A-Za-z0-9_-]{11})\"[\\s\\S]{0,3600}?\"title\":\\{\"runs\":\\[\\{\"text\":\"([^\"]+)\"/g\n  ];\n  for (const regex of patterns) {\n    let match;\n    while ((match = regex.exec(text)) !== null) {\n      const videoId = match[1];\n      const title = decode(match[2]);\n      const context = text.slice(Math.max(0, match.index - 1400), Math.min(text.length, match.index + 5200));\n      if (!videoId || !title || seen.has(videoId)) continue;\n      if (looksBadYoutubeTitle(title, context)) continue;\n      if (looksShort(title, context)) continue;\n      seen.add(videoId);\n      out.push({\n        videoId,\n        title,\n        link: 'https://www.youtube.com/watch?v=' + videoId,\n        kind: looksLive(title, context, pageKind) ? 'stream' : 'video',\n        source: 'youtube-page-' + pageKind,\n        pubTime: 0\n      });\n      if (out.length >= 20) break;\n    }\n  }\n  return out;\n}\n\nfunction extractVideoFromRss(item) {\n  const title = decode(item.title || item.name || '');\n  const desc = decode(item.contentSnippet || item.description || item.content || '');\n  const rawLink = item.link || item.guid || item.id || item.url || '';\n  const packed = JSON.stringify(item).slice(0, 2000);\n  const videoId = videoIdFrom(rawLink) || videoIdFrom(item.id) || videoIdFrom(item.guid) || videoIdFrom(packed);\n  if (!videoId || !title) return null;\n  if (looksBadYoutubeTitle(title, desc)) return null;\n  if (looksShort(title, desc + ' ' + rawLink)) return null;\n  return {\n    videoId,\n    title,\n    link: 'https://www.youtube.com/watch?v=' + videoId,\n    kind: looksLive(title, desc, '') ? 'stream' : 'video',\n    source: 'youtube-rss',\n    pubTime: parseTime(item.isoDate || item.pubDate || item.published || item.updated || item.date)\n  };\n}\n\nlet videos = [];\nconst htmlItems = items.map(htmlFrom).filter(Boolean);\nfor (let i = 0; i < htmlItems.length; i++) {\n  const pageKind = i === 1 ? 'stream' : 'video';\n  videos.push(...extractVideosFromHtml(htmlItems[i], pageKind));\n}\n\nfor (const item of items) {\n  const probe = String(item.link || item.guid || item.id || item.url || '') + ' ' + JSON.stringify(item).slice(0, 800);\n  const isYoutubeItem = /youtube\\.com\\/watch|youtu\\.be\\/|yt:video|youtube\\.com\\/feeds/i.test(probe);\n  if (!isYoutubeItem) continue;\n  const video = extractVideoFromRss(item);\n  if (video) videos.push(video);\n}\n\nconst byId = new Map();\nfor (const item of videos) {\n  if (!byId.has(item.videoId)) byId.set(item.videoId, item);\n  else {\n    const old = byId.get(item.videoId);\n    if ((item.pubTime || 0) > (old.pubTime || 0) || item.source === 'youtube-rss') byId.set(item.videoId, item);\n  }\n}\n\nconst all = [...byId.values()];\nif (!all.length) return [];\n\nall.sort((a, b) => {\n  const timeDelta = (b.pubTime || 0) - (a.pubTime || 0);\n  if (timeDelta) return timeDelta;\n  const rssDelta = Number(b.source === 'youtube-rss') - Number(a.source === 'youtube-rss');\n  if (rssDelta) return rssDelta;\n  return Number(b.kind === 'stream') - Number(a.kind === 'stream');\n});\n\n// Important: only the latest channel item may be posted. If latest is already posted, do not backfill older videos.\nconst post = all[0];\nconst normalizedLink = normalizeYoutubeLink(post.link);\nconst alreadyPosted = postedVideoIds.has(post.videoId) || postedLinks.has(normalizedLink) || postedHashes.has('youtube-' + post.videoId);\nif (alreadyPosted) return [];\n\nstaticData.lastYouTubeVideoId = post.videoId;\nstaticData.youtubePublishedIds = [post.videoId, ...staticData.youtubePublishedIds.filter(id => id !== post.videoId)].slice(0, 80);\nstaticData.lastYouTubeLink = normalizedLink;\nstaticData.lastYouTubePublishedAt = new Date().toISOString();\n\nconst liveLike = post.kind === 'stream';\nconst prefix = liveLike ? 'Zanka TV canlı yayında:' : 'Zanka TV yeni video yayında:';\n\nreturn [{\n  json: {\n    title: post.title,\n    link: normalizedLink,\n    content: prefix + '\\n\\n' + post.title + '\\n\\n' + normalizedLink,\n    hash: 'youtube-' + post.videoId,\n    category: liveLike ? 'YouTube Canli' : 'YouTube Video',\n    imageUrl: 'https://i.ytimg.com/vi/' + post.videoId + '/hqdefault.jpg',\n    source: post.source,\n    pubDate: post.pubTime ? new Date(post.pubTime).toISOString() : new Date().toISOString(),\n    duplicateCheck: 'latest-only-static-and-sheet'\n  }\n}];"
+      },
+      "id": "46d4b5c2-d80c-4c5e-95a1-c18083691b8e",
+      "name": "YouTube Duplicate Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3008,
+        16800
+      ]
+    },
+    {
+      "parameters": {
+        "scheduleMode": "now",
+        "publications": {
+          "publication": [
+            {
+              "socialMediaAccountId": "YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID",
+              "platformSettings": "={{ JSON.stringify({ \"type\": \"TWITTER\" }) }}",
+              "posts": {
+                "post": [
+                  {
+                    "attachmentPaths": {
+                      "path": [
+                        {}
+                      ]
+                    },
+                    "content": "={{ $json.content }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "a3ae9dcf-1203-445e-90f5-b9b0cc4d4684",
+      "name": "Publish YouTube Post",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        3280,
+        16800
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Hash": "={{ $node[\"YouTube Duplicate Filter\"].json.hash }}",
+            "Baslik": "={{ $node[\"YouTube Duplicate Filter\"].json.title }}",
+            "Link": "={{ $node[\"YouTube Duplicate Filter\"].json.link }}",
+            "Kategori": "={{ $node[\"YouTube Duplicate Filter\"].json.category }}",
+            "Trend Skoru": "",
+            "Tweet Metni": "={{ $node[\"YouTube Duplicate Filter\"].json.content }}",
+            "Gorsel URL": "={{ $node[\"YouTube Duplicate Filter\"].json.imageUrl || \"\" }}",
+            "Yayinlanma Tarihi": "={{ $node[\"YouTube Duplicate Filter\"].json.isoDate || $node[\"YouTube Duplicate Filter\"].json.pubDate || $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Hash",
+              "displayName": "Hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Baslik",
+              "displayName": "Baslik",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Trend Skoru",
+              "displayName": "Trend Skoru",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tweet Metni",
+              "displayName": "Tweet Metni",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Gorsel URL",
+              "displayName": "Gorsel URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Yayinlanma Tarihi",
+              "displayName": "Yayinlanma Tarihi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3536,
+        16800
+      ],
+      "id": "073a52b1-5072-4d10-9078-a605ee26057f",
+      "name": "Log YouTube Post in sheet",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://finans.truncgil.com/today.json",
+        "options": {}
+      },
+      "id": "0128e339-b551-4b38-bcc2-85cced97055c",
+      "name": "Market API - Truncgil Finans",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2752,
+        15200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+        "options": {}
+      },
+      "id": "59fb2ffc-13c9-44a1-b247-d4689cd866c8",
+      "name": "Market API - Bitcoin USD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        15440
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "6cc4d21d-321b-4a46-bcdb-fdf76a4cb557",
+      "name": "Merge Market Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3088,
+        15312
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/@YOUR_YOUTUBE_HANDLE/videos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "aac88597-be9c-4ca2-8d3d-e7bb1ea0a2b3",
+      "name": "ZankaTV YouTube Videos Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2192,
+        16992
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/@YOUR_YOUTUBE_HANDLE/streams",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "c4299463-5403-4459-bbec-c42decc14263",
+      "name": "ZankaTV YouTube Streams Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2192,
+        17200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_YOUTUBE_CHANNEL_ID",
+        "options": {}
+      },
+      "id": "83fd5712-628d-43f1-9a35-cc79fd8ad606",
+      "name": "ZankaTV YouTube Channel Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        16784
+      ],
+      "continueOnFail": true,
+      "notes": "Resmi YouTube kanal feedi. Sayfa kazima video/yayin bulamazsa bu feed fallback olarak kullanilir."
+    },
+    {
+      "parameters": {
+        "url": "https://www.aljazeera.com/xml/rss/all.xml",
+        "options": {}
+      },
+      "id": "d3e7f9a8-1099-4290-a0d0-eb223f2d7964",
+      "name": "News RSS 01",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2192,
+        15664
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "9de53934-9875-4611-8dc3-5b848d54e6ed",
+      "name": "Schedule Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        1408,
+        16320
+      ],
+      "typeVersion": 1.2,
+      "notes": "Haber akisi 40 dakikada bir tetiklenir; arkasindaki jitter 0-10 dk ekleyerek 40-50 dk dogal aralik verir."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "media-check-condition",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "leftValue": "={{ $node[\"Article Image Enricher\"].json.imageUrl || \"\" }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a21f2688-c1bc-4f80-b0dd-66e4a83571f5",
+      "name": "Media Check IF1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        4640,
+        15952
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "uploadSource": "url",
+        "url": "={{ $node[\"Article Image Enricher\"].json.imageUrl || \"\" }}",
+        "filenameHint": "={{ ($node[\"Article Image Enricher\"].json.hash || \"gorsel\").substring(0, 20) + \".jpg\" }}"
+      },
+      "id": "78e9e2bf-6ca3-45ae-8765-8f7748055f40",
+      "name": "Upload media1",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        4784,
+        15760
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "getUploadStatus",
+        "importId": "={{ $json.id }}"
+      },
+      "id": "ad2b6c0a-8972-4a63-ab44-9f1786408334",
+      "name": "Get upload status1",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        5152,
+        15888
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "upload-ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ String($json.state || \"\").toUpperCase() }}",
+              "rightValue": "READY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "243e85e1-c79c-43ea-9495-25ea4653c5d5",
+      "name": "Upload Ready IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        4848,
+        16208
+      ],
+      "typeVersion": 2.2,
+      "notes": "Gorselli haber secildiyse media READY degilse paylasim yapma. Text-only sadece RSS havuzunda hic gorsel yoksa calisir."
+    },
+    {
+      "parameters": {
+        "scheduleMode": "now",
+        "publications": {
+          "publication": [
+            {
+              "socialMediaAccountId": "YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID",
+              "platformSettings": "={{ JSON.stringify({ \"type\": \"TWITTER\" }) }}",
+              "posts": {
+                "post": [
+                  {
+                    "attachmentPaths": {
+                      "path": [
+                        {
+                          "value": "={{ String($json.s3Key || $json.path || $json.url || $json.id || \"\") }}"
+                        }
+                      ]
+                    },
+                    "content": "={{ ($node[\"AI Agent1\"].json.output || \"\").substring(0, 280) }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "1d68c5cd-1281-4b96-b3a5-7de21417b63f",
+      "name": "Publish Post1",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        4336,
+        16272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "scheduleMode": "now",
+        "publications": {
+          "publication": [
+            {
+              "socialMediaAccountId": "YOUR_POSTPULSE_SOCIAL_ACCOUNT_ID",
+              "platformSettings": "={{ JSON.stringify({ \"type\": \"TWITTER\" }) }}",
+              "posts": {
+                "post": [
+                  {
+                    "attachmentPaths": {
+                      "path": [
+                        {}
+                      ]
+                    },
+                    "content": "={{ ($node[\"AI Agent1\"].json.output || \"\").substring(0, 280) }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "43c13e54-06db-45af-8b9d-42468a68c154",
+      "name": "Publish Post (text only)1",
+      "type": "@postpulse/n8n-nodes-postpulse.postPulse",
+      "position": [
+        3776,
+        16272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sen ZankaMedya icin BPT tarzina yakin, sade ve guvenilir sosyal medya haber editorusun.\n\nGorev:\nRSS havuzundan secilen haberi anlamini bozmadan X postuna cevir. Sistem gorselli haberleri oncelikli secer; havuzda hic gorselli haber yoksa metin-only haber gelebilir.\n\nZorunlu format:\n1. satir: Kisa, net ve haber gibi bir baslik cumlesi yaz.\n2. satir: Bos satir birak.\n3. satir: — ile baslayan birinci kisa detay.\n4. satir: — ile baslayan ikinci kisa detay. Ikinci detay yoksa yazma.\n\nKurallar:\n- Toplam metin 260 karakteri gecmesin.\n- Link, kaynak, tarih, emoji ve hashtag ekleme.\n- Reklam dili, tik avcisi dil ve abartili ifade kullanma.\n- Iddia ise kesin bilgi gibi yazma; \"iddia edildi\" veya \"one suruldu\" de.\n- Sadece post metnini dondur.\n\nHaber basligi:\n{{ $json.title }}\n\nAciklama:\n{{ $json.description || $json.contentSnippet || $json.content || \"\" }}\n\nSecim modu:\n{{ $json.selectionMode }}\n\nRSS havuzundaki gorselli aday sayisi:\n{{ $json.imageCandidateCount }}/{{ $json.totalCandidateCount }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4256,
+        15616
+      ],
+      "id": "e9a8eabe-3556-46c2-8b72-f7355e951cfa",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        4240,
+        15920
+      ],
+      "id": "8a2b1299-4ab4-40da-be81-5d17334dacfc",
+      "name": "Google Gemini Chat Model1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nconst TREND_FRESH_HOURS = 0;\nconst MAX_NEWS_AGE_HOURS = 24;\nconst MAX_SHEET_ROWS_TO_SCAN = 350;\nconst NIGHT_START_HOUR = 3;\nconst NIGHT_END_HOUR = 7;\nconst NIGHT_MAX_NON_CRITICAL_POSTS = 2;\nconst IN_FLIGHT_LOCK_TTL_HOURS = 12;\nconst LOCK_NAMESPACE = 'zankaNewsLocksV2';\nconst EXECUTION_MODE = typeof $execution !== 'undefined' ? String($execution.mode || '') : '';\nconst IS_MANUAL_TEST = EXECUTION_MODE === 'manual' || EXECUTION_MODE === 'test';\n\nconst STOP_WORDS = new Set([\n  'icin','ile','olan','oldu','sonra','once','gibi','daha','cok','az','bir','iki','yeni','son','dakika','haber','haberi','aciklama','acikladi','geldi','gelen','karsi','uzere','baskan','bakan','turkiye','turk','de','da','ve','veya','ama','fakat','mi','mu','ne','bu','su','o','en','ilk','sonu','sonuc','sonuclari','canli','video','foto','fotograf','goruntu','gundem','ekonomi','teknoloji','spor','the','and','for','with','from','that','this','into','about','after','before','over','under','says','said','new','news','live','latest','breaking','update','updates','video','photos','business','politics','world','report','reports','market','markets','will','are','has','have','was','were','their','its','who','what','when','where','why','how','google','trend','trends'\n]);\n\nconst AD_PATTERNS = [\n  /reklam|sponsor|sponsorlu|advertorial|tanitim|tanıtım|ilan|kampanya|indirim|firsat|fırsat|kupon|cekilis|çekiliş|hediye|alisveris|alışveriş/i,\n  /pirlanta|pırlanta|tek\\s*tas|tek\\s*taş|alyans|mucevher|mücevher|jewellery|jewelry|yuzuk|yüzük/i,\n  /satilik|satılık|emlak|konut projesi|otomobil kampanyasi|otomobil kampanyası/i,\n  /marka is birligi|marka iş birliği|is birligiyle|iş birliğiyle/i\n];\n\nfunction stripHtml(value) {\n  return String(value || '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<br\\s*\\/?>(\\s*)/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction normalizeText(value) {\n  return stripHtml(value)\n    .toLocaleLowerCase('tr-TR')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/\\u0131/g, 'i')\n    .replace(/[^a-z0-9\\s]/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction canonicalUrl(value) {\n  const raw = String(value || '').trim();\n  if (!raw) return '';\n  try {\n    const url = new URL(raw);\n    url.hash = '';\n    for (const key of [...url.searchParams.keys()]) {\n      if (/^(utm_|fbclid|gclid|yclid|mc_)/i.test(key)) url.searchParams.delete(key);\n    }\n    return url.toString().replace(/\\/$/, '');\n  } catch (error) {\n    return raw.replace(/\\s+/g, '').replace(/\\/$/, '');\n  }\n}\n\nfunction sourceDomain(link) {\n  try { return new URL(link).hostname.replace(/^www\\./, ''); }\n  catch { return ''; }\n}\n\nfunction sourceLabelFor(domain) {\n  const labels = {\n    'ntv.com.tr': 'NTV',\n    'sozcu.com.tr': 'Sozcu',\n    'ekonomim.net': 'Ekonomim',\n    'dunyatimes.com': 'Dunya Times',\n    'onedio.com': 'Onedio',\n    'nytimes.com': 'The New York Times',\n    'washingtonpost.com': 'The Washington Post',\n    'mynet.com': 'Mynet',\n    'milliyet.com.tr': 'Milliyet',\n    'bbc.co.uk': 'BBC',\n    'dw.com': 'DW Turkce',\n    'rss.dw.com': 'DW Turkce',\n    'theguardian.com': 'The Guardian',\n    'aljazeera.com': 'Al Jazeera'\n  };\n  return labels[domain] || domain || '';\n}\n\nfunction hashText(value) {\n  const text = String(value || '');\n  let hash = 2166136261;\n  for (let i = 0; i < text.length; i++) {\n    hash ^= text.charCodeAt(i);\n    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);\n  }\n  return (hash >>> 0).toString(16).padStart(8, '0');\n}\n\nfunction decodeMaybe(value) {\n  let text = String(value || '').replace(/&amp;/g, '&').trim();\n  if (/%2F|%3A|%3F|%26/i.test(text)) {\n    try { text = decodeURIComponent(text); } catch {}\n  }\n  return text;\n}\n\nfunction normalizeImageUrl(value, baseUrl = '') {\n  let url = decodeMaybe(value);\n  if (!url) return '';\n  if (url.startsWith('//')) url = 'https:' + url;\n  try { url = new URL(url, baseUrl || undefined).toString(); } catch {}\n  return url;\n}\n\nfunction collectImageCandidates(value, keyPath = '', out = []) {\n  if (value === null || value === undefined) return out;\n  const keyText = String(keyPath || '').toLowerCase();\n\n  if (typeof value === 'string') {\n    const raw = value;\n    const urls = raw.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\n    for (const url of urls) out.push({ url, keyPath });\n\n    const htmlAttrs = [...raw.matchAll(/(?:src|href|content|url)=['\"]([^'\"]+)['\"]/gi)];\n    for (const match of htmlAttrs) out.push({ url: match[1], keyPath: keyPath + '.html' });\n\n    if (/^https?:\\/\\//i.test(raw.trim())) out.push({ url: raw.trim(), keyPath });\n    return out;\n  }\n\n  if (Array.isArray(value)) {\n    value.forEach((entry, index) => collectImageCandidates(entry, keyPath + '[' + index + ']', out));\n    return out;\n  }\n\n  if (typeof value === 'object') {\n    const typeHint = normalizeText(value.type || value.medium || value.mime || value.mimeType || value.contentType || '');\n    const objectHint = /image|img|thumb|thumbnail|media|enclosure|photo|resim|gorsel|görsel/.test(keyText) || /image|jpeg|jpg|png|webp/.test(typeHint);\n\n    for (const [key, entry] of Object.entries(value)) {\n      const nextPath = keyPath ? keyPath + '.' + key : key;\n      if (objectHint && typeof entry === 'string' && /^(https?:)?\\/\\//i.test(entry.trim())) out.push({ url: entry, keyPath: nextPath + '.hinted' });\n      collectImageCandidates(entry, nextPath, out);\n    }\n  }\n\n  return out;\n}\n\nfunction imageScore(url, keyPath = '') {\n  const value = normalizeImageUrl(url);\n  if (!/^https?:\\/\\//i.test(value)) return -999;\n  if (/(logo|favicon|sprite|avatar|profile|tracking|pixel|doubleclick|google-analytics|1x1|blank|spacer|transparent|adsystem|adservice|banner|svg|placeholder|default-image|google-news|news-google)/i.test(value)) return -999;\n  if (/news\\.google\\.|googleusercontent\\.com|gstatic\\.com|google\\.com\\/images|google\\.com\\/logos|lh3\\.googleusercontent\\.com/i.test(value)) return -999;\n\n  let score = 0;\n  if (/\\.(jpe?g|png|webp)(\\?|$)/i.test(value)) score += 90;\n  if (/(image|images|img|photo|photos|thumb|thumbnail|media|cdn|resim|gorsel|görsel|haberresim|upload|uploads|i\\.ytimg|pbs\\.twimg)/i.test(value)) score += 50;\n  if (/(image|img|thumb|thumbnail|media|enclosure|photo|resim|gorsel|görsel|urltoimage)/i.test(keyPath)) score += 45;\n  if (/(width|w)=([6-9]\\d{2}|[1-9]\\d{3,})/i.test(value)) score += 8;\n  if (/(height|h)=([3-9]\\d{2}|[1-9]\\d{3,})/i.test(value)) score += 6;\n  if (/\\/\\d{3,}x\\d{3,}\\//.test(value)) score += 8;\n  return score;\n}\n\nfunction getImageUrl(json) {\n  const candidates = collectImageCandidates(json)\n    .map(item => ({ url: normalizeImageUrl(item.url, json.link || json.guid || ''), keyPath: item.keyPath }))\n    .filter(item => item.url);\n\n  const unique = [];\n  const seen = new Set();\n  for (const item of candidates) {\n    const key = item.url.split('#')[0];\n    if (seen.has(key)) continue;\n    seen.add(key);\n    unique.push(item);\n  }\n\n  unique.sort((a, b) => imageScore(b.url, b.keyPath) - imageScore(a.url, a.keyPath));\n  const best = unique.find(item => imageScore(item.url, item.keyPath) >= 80);\n  return best?.url || '';\n}\n\nfunction imageKeyFor(value) {\n  const raw = normalizeImageUrl(value);\n  if (!/^https?:\\/\\//i.test(raw)) return '';\n  try {\n    const url = new URL(raw);\n    url.hash = '';\n    url.search = '';\n    return (url.hostname.replace(/^www\\./, '') + url.pathname).toLocaleLowerCase('tr-TR').replace(/\\/$/, '');\n  } catch {\n    return raw.split('?')[0].split('#')[0].toLocaleLowerCase('tr-TR').replace(/\\/$/, '');\n  }\n}\n\nfunction parseDate(value) {\n  const time = value ? Date.parse(value) : NaN;\n  return Number.isFinite(time) ? time : 0;\n}\n\nfunction tokensFor(value) {\n  return normalizeText(value)\n    .split(/\\s+/)\n    .filter(word => word.length > 3 && !STOP_WORDS.has(word) && !/^\\d+$/.test(word));\n}\n\nfunction eventKeyFor(json) {\n  const title = normalizeText(json.title || json.Baslik || '');\n  const desc = normalizeText(json.description || json.contentSnippet || json.content || '').slice(0, 300);\n  const tokens = [...new Set((title + ' ' + desc).split(/\\s+/).filter(word => word.length > 3 && !STOP_WORDS.has(word) && !/^\\d+$/.test(word)))];\n  return tokens.sort().slice(0, 9).join(' ');\n}\n\nfunction fingerprintFor(json) {\n  const text = [json.title, json.Baslik, json.description, json.contentSnippet, json.content, json['Tweet Metni'], json.Kategori, json.category, json.link, json.Link].filter(Boolean).join(' ');\n  const tokens = [...new Set(tokensFor(text))];\n  const important = tokens.filter(token => token.length >= 5 || /\\d{4}/.test(token));\n  return { text: normalizeText(text), tokens: new Set(tokens), important: new Set(important) };\n}\n\nfunction overlapCount(a, b) {\n  let count = 0;\n  for (const token of a) if (b.has(token)) count++;\n  return count;\n}\n\nfunction isSimilar(a, b) {\n  if (!a.tokens.size || !b.tokens.size) return false;\n  const overlap = overlapCount(a.tokens, b.tokens);\n  const minSize = Math.min(a.tokens.size, b.tokens.size);\n  const unionSize = new Set([...a.tokens, ...b.tokens]).size || 1;\n  const importantOverlap = overlapCount(a.important, b.important);\n  if (overlap >= 7 && overlap / minSize >= 0.60) return true;\n  if (overlap >= 8 && overlap / unionSize >= 0.40) return true;\n  if (importantOverlap >= 4 && overlap >= 6) return true;\n  return false;\n}\n\nfunction isAdLike(json) {\n  const text = [json.title, json.description, json.contentSnippet, json.content, json.link, json.category, json.categories?.join(' ')].filter(Boolean).join(' ');\n  const normalized = normalizeText(text);\n  return AD_PATTERNS.some(pattern => pattern.test(text) || pattern.test(normalized));\n}\n\nfunction hasRealEarthquakeDetails(json) {\n  const title = normalizeText(json.title || json.Baslik || '');\n  const text = normalizeText([json.title, json.description, json.contentSnippet, json.content, json.category, json.link].filter(Boolean).join(' '));\n  if (!/deprem/.test(text)) return false;\n\n  const titleIsGeneric = /(deprem mi oldu|deprem oldu mu|son depremler|guncel deprem listesi|deprem listesi|gunun son depremleri|en son deprem nerede|son deprem nerede)/.test(title);\n  if (titleIsGeneric) return false;\n\n  const magnitudePattern = /\\b[1-9](?:[.,]\\d)?\\s*(buyuklugunde|siddetinde|ml|mw)\\b|\\bm\\s*[=:]?\\s*[1-9](?:[.,]\\d)?\\b/;\n  const concreteEventPattern = /(merkez ussu|merkezussu|ilinde|ilcesinde|aciklarinda|meydana geldi|can kaybi|yarali|hasar|yikildi|artci|sarsildi|afad duyurdu|kandilli duyurdu)/;\n\n  return magnitudePattern.test(title) || (magnitudePattern.test(text) && concreteEventPattern.test(text));\n}\n\nfunction isGenericEarthquakeTracker(json) {\n  const text = normalizeText([json.title, json.description, json.contentSnippet, json.content, json.category, json.link].filter(Boolean).join(' '));\n  if (!/deprem/.test(text)) return false;\n\n  const genericTrackerPattern = /(son depremler|guncel deprem listesi|deprem listesi|deprem mi oldu|deprem oldu mu|kandilli rasathanesi|afad ve kandilli|afad kandilli|gunun son depremleri|deprem verileri|son depremleri takip|sarsintilar izlenebiliyor|resmi kaynaklardan sorgulanabiliyor|son deprem nerede|en son deprem nerede|deprem sorgulama)/;\n  if (!genericTrackerPattern.test(text)) return false;\n\n  return !hasRealEarthquakeDetails(json);\n}\n\nfunction isCriticalNews(json) {\n  const text = normalizeText([json.title, json.description, json.contentSnippet, json.content, json.category, json.link].filter(Boolean).join(' '));\n  if (/(deprem|tsunami|patlama|saldiri|saldırı|yangin|yangın|sel|firtina|fırtına|heyelan|afet|ucak dustu|uçak düştü|helikopter|tren kazasi|tren kazası|maden kazasi|maden kazası|sehit|şehit|suikast|rehine|savas|savaş|catism|çatışm|bombali|bombalı|teror|terör)/.test(text)) return true;\n  if (/(cumhurbaskani|bakan|meclis|mahkeme|savci|savcı|gozalti|gözaltı|tutuklama|istifa|yasak)/.test(text) && /(son dakika|acil|kritik|flash|flas|sicak|sıcak)/.test(text)) return true;\n  return false;\n}\n\nfunction isVeryCriticalNews(json) {\n  const text = normalizeText([json.title, json.description, json.contentSnippet, json.content, json.category, json.link].filter(Boolean).join(' '));\n  if (/(deprem|tsunami|patlama|bombali|bombalı|saldiri|saldırı|teror|terör|silahli saldiri|silahlı saldırı|yangin|yangın|sel|firtina|fırtına|heyelan|afet|ucak dustu|uçak düştü|helikopter dustu|helikopter düştü|tren kazasi|tren kazası|maden kazasi|maden kazası|sehit|şehit|suikast|rehine|savas|savaş|catism|çatışm|kimyasal|nukleer|nükleer)/.test(text)) return true;\n  if (/(son dakika|acil|kritik|flash|flas|sicak|sıcak)/.test(text) && /(can kaybi|can kaybı|olu|ölü|yarali|yaralı|tahliye|alarm|patlama|deprem|saldiri|saldırı|afet)/.test(text)) return true;\n  return false;\n}\n\nfunction localParts(dateValue) {\n  const date = dateValue ? new Date(dateValue) : new Date();\n  if (Number.isNaN(date.getTime())) return null;\n  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(date).reduce((acc, part) => {\n    if (part.type !== 'literal') acc[part.type] = part.value;\n    return acc;\n  }, {});\n  const hour = Number(parts.hour === '24' ? '0' : parts.hour);\n  return { dateKey: parts.year + '-' + parts.month + '-' + parts.day, hour };\n}\n\nfunction isNightNow() {\n  const parts = localParts(new Date());\n  return parts && parts.hour >= NIGHT_START_HOUR && parts.hour < NIGHT_END_HOUR;\n}\n\nfunction isBlockedPublishSource(json) {\n  const link = canonicalUrl(json.link || json.guid || json.url || '');\n  const domain = sourceDomain(link);\n  const title = normalizeText(json.title || '');\n  return domain.includes('news.google.') || domain.includes('trends.google.') || domain === 'google.com' || domain.endsWith('.google.com') || title.includes('google news') || title.includes('google haber');\n}\n\nfunction isGoogleTrendItem(json) {\n  const link = canonicalUrl(json.link || json.guid || json.url || '');\n  const domain = sourceDomain(link);\n  const keys = Object.keys(json || {}).join(' ').toLocaleLowerCase('tr-TR');\n  return domain.includes('trends.google') || domain.includes('news.google.com') || keys.includes('approx') || keys.includes('traffic') || normalizeText(json.link || '').includes('trends google');\n}\n\nfunction lockKeysForCandidate(item) {\n  const keys = [];\n  const canonical = canonicalUrl(item.canonicalUrl || item.link || item.guid || '');\n  const eventKey = item.eventKey || eventKeyFor(item);\n  const imageKey = item.imageKey || imageKeyFor(item.imageUrl || getImageUrl(item));\n  const tokenKey = [...new Set(tokensFor([item.title, item.description, item.contentSnippet, item.content].filter(Boolean).join(' ')))]\n    .sort()\n    .slice(0, 12)\n    .join(' ');\n\n  if (canonical) keys.push('url:' + hashText(canonical));\n  if (item.hash) keys.push('hash:' + String(item.hash));\n  if (eventKey) keys.push('event:' + hashText(eventKey));\n  if (imageKey) keys.push('img:' + hashText(imageKey));\n  if (tokenKey) keys.push('tok:' + hashText(tokenKey));\n\n  return [...new Set(keys)];\n}\n\nfunction getLockStore() {\n  try {\n    if (typeof $getWorkflowStaticData !== 'function') return null;\n    const data = $getWorkflowStaticData('global');\n    if (!data[LOCK_NAMESPACE] || typeof data[LOCK_NAMESPACE] !== 'object') data[LOCK_NAMESPACE] = {};\n    return data[LOCK_NAMESPACE];\n  } catch {\n    return null;\n  }\n}\n\nfunction cleanupLockStore(store, nowMs) {\n  if (!store) return;\n  const ttlMs = IN_FLIGHT_LOCK_TTL_HOURS * 36e5;\n  for (const [key, value] of Object.entries(store)) {\n    const time = Number(value) || 0;\n    if (!time || nowMs - time > ttlMs) delete store[key];\n  }\n}\n\nfunction isCandidateLocked(item, store, nowMs) {\n  if (!store) return false;\n  const ttlMs = IN_FLIGHT_LOCK_TTL_HOURS * 36e5;\n  return lockKeysForCandidate(item).some(key => store[key] && nowMs - Number(store[key]) <= ttlMs);\n}\n\nfunction lockCandidate(item, store, nowMs) {\n  const keys = lockKeysForCandidate(item);\n  if (!store) return keys;\n  for (const key of keys) store[key] = nowMs;\n  return keys;\n}\n\nconst sheetRowsRaw = [];\nconst rssRows = [];\nconst trendRows = []; // Google Trends iptal: bos kalir, skora etki etmez.\n\nfor (const item of allItems) {\n  const json = item.json || {};\n  if (json.Link || json.Hash || json.Baslik || json['Tweet Metni']) {\n    sheetRowsRaw.push(json);\n    continue;\n  }\n  if (json.title && (json.link || json.guid || json.pubDate || json.isoDate)) {\n    if (isGoogleTrendItem(json)) continue;\n    rssRows.push(json);\n  }\n}\n\nconst sheetRows = sheetRowsRaw.slice(-MAX_SHEET_ROWS_TO_SCAN);\nconst postedLinks = new Set();\nconst postedHashes = new Set();\nconst postedKeys = new Set();\nconst postedFingerprints = [];\nconst postedImageKeys = new Set();\nconst now = Date.now();\nconst nowLocal = localParts(new Date());\nlet nightNormalPostCount = 0;\n\nfor (const row of sheetRows) {\n  const link = canonicalUrl(row.Link || row.link || row.URL || row.url || '');\n  if (link) postedLinks.add(link);\n  const hash = String(row.Hash || row.hash || '').trim();\n  if (hash) postedHashes.add(hash);\n  const key = eventKeyFor({ title: row.Baslik || row.title || '', description: row['Tweet Metni'] || row.description || '' });\n  if (key) postedKeys.add(key);\n  const fingerprint = fingerprintFor(row);\n  if (fingerprint.tokens.size) postedFingerprints.push(fingerprint);\n  const postedImageKey = imageKeyFor(row['Gorsel URL'] || row.imageUrl || row.Image || row.image || '');\n  if (postedImageKey) postedImageKeys.add(postedImageKey);\n\n  const category = normalizeText(row.Kategori || row.category || '');\n  const rowDate = row['Yayinlanma Tarihi'] || row.pubDate || row.date || row.created || '';\n  const rowLocal = rowDate ? localParts(rowDate) : null;\n  if (nowLocal && rowLocal && rowLocal.dateKey === nowLocal.dateKey && rowLocal.hour >= NIGHT_START_HOUR && rowLocal.hour < NIGHT_END_HOUR && !/(youtube|market|piyasa)/.test(category)) nightNormalPostCount++;\n}\n\nlet newestTrendTime = 0;\nconst trendTokenSet = new Set();\nconst trendTitles = [];\nconst trendsFresh = false;\n\nconst candidates = [];\nfor (const json of rssRows) {\n  if (isBlockedPublishSource(json)) continue;\n  if (isAdLike(json)) continue;\n  if (isGenericEarthquakeTracker(json)) continue;\n\n  const rawLink = json.link || json.guid || json.url || '';\n  const canonical = canonicalUrl(rawLink);\n  const eventKey = eventKeyFor(json) || normalizeText(json.title || '').slice(0, 90) || canonical;\n  const hash = hashText(eventKey || canonical);\n  const fingerprint = fingerprintFor(json);\n  const looksPosted = postedFingerprints.some(posted => isSimilar(fingerprint, posted));\n\n  if (!canonical || postedLinks.has(canonical) || postedHashes.has(hash) || postedHashes.has(eventKey) || postedKeys.has(eventKey) || looksPosted) continue;\n\n  const imageUrl = getImageUrl(json);\n  const imageKey = imageKeyFor(imageUrl);\n  const imageAlreadyPosted = imageKey && postedImageKeys.has(imageKey);\n  if (imageAlreadyPosted) continue;\n  const source = sourceDomain(canonical);\n  const pubTime = parseDate(json.isoDate || json.pubDate || json.date || json.published || json.created);\n  const ageHours = pubTime ? Math.max(0, (now - pubTime) / 36e5) : 24;\n  if (pubTime && ageHours > MAX_NEWS_AGE_HOURS) continue;\n\n  const isCritical = isCriticalNews(json);\n  const isVeryCritical = isVeryCriticalNews(json);\n  const matchedTerms = [...fingerprint.tokens].filter(token => trendTokenSet.has(token));\n  const trendOverlap = matchedTerms.length;\n\n  candidates.push({\n    ...json,\n    link: rawLink,\n    canonicalUrl: canonical,\n    eventKey,\n    hash,\n    imageUrl,\n    imageKey,\n    hasImage: Boolean(imageUrl),\n    source,\n    sourceLabel: sourceLabelFor(source),\n    pubTime,\n    ageHours,\n    isCritical,\n    isVeryCritical,\n    trendOverlap,\n    trendMatchedTerms: matchedTerms.slice(0, 8).join(', '),\n    dedupeTokens: [...fingerprint.tokens],\n    cleanTitle: stripHtml(json.title || ''),\n    cleanDescription: stripHtml(json.description || json.contentSnippet || json.content || ''),\n  });\n}\n\nconst lockStore = getLockStore();\ncleanupLockStore(lockStore, now);\nconst availableCandidates = lockStore ? candidates.filter(item => !isCandidateLocked(item, lockStore, now)) : candidates;\nconst lockedCandidateCount = candidates.length - availableCandidates.length;\n\nif (!availableCandidates.length) return [];\n\nconst imageCandidateCount = availableCandidates.filter(item => item.hasImage).length;\nlet eligible = imageCandidateCount > 0 ? availableCandidates.filter(item => item.hasImage) : availableCandidates;\n\nif (!IS_MANUAL_TEST && isNightNow()) {\n  eligible = eligible.filter(item => item.isVeryCritical);\n  if (!eligible.length) return [];\n}\n\nconst groups = [];\nfor (const item of eligible) {\n  const tokens = new Set(item.dedupeTokens || String(item.eventKey || '').split(/\\s+/).filter(Boolean));\n  let target = null;\n  for (const group of groups) {\n    const overlap = [...tokens].filter(token => group.tokens.has(token)).length;\n    const smallerSize = Math.min(tokens.size || 1, group.tokens.size || 1);\n    const neededOverlap = Math.min(4, Math.max(2, Math.ceil(smallerSize * 0.52)));\n    if (overlap >= neededOverlap) { target = group; break; }\n  }\n  if (!target) {\n    target = { key: item.eventKey || item.hash, tokens, items: [] };\n    groups.push(target);\n  } else {\n    for (const token of tokens) target.tokens.add(token);\n  }\n  target.items.push(item);\n}\n\nconst grouped = [];\nfor (const group of groups) {\n  const groupItems = group.items;\n  groupItems.sort((a, b) => {\n    const timeDelta = (b.pubTime || 0) - (a.pubTime || 0);\n    if (timeDelta) return timeDelta;\n    const imageDelta = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));\n    if (imageDelta) return imageDelta;\n    return Number(Boolean(b.isCritical)) - Number(Boolean(a.isCritical));\n  });\n  const best = groupItems[0];\n  const sources = [...new Set(groupItems.map(item => item.source).filter(Boolean))];\n  grouped.push({ best, sources, count: groupItems.length, key: group.key });\n}\n\ngrouped.sort((a, b) => {\n  const timeDelta = (b.best.pubTime || 0) - (a.best.pubTime || 0);\n  if (timeDelta) return timeDelta;\n  const imageDelta = Number(Boolean(b.best.imageUrl)) - Number(Boolean(a.best.imageUrl));\n  if (imageDelta) return imageDelta;\n  return Number(Boolean(b.best.isCritical)) - Number(Boolean(a.best.isCritical));\n});\n\nconst winner = grouped[0];\nconst best = winner.best;\nconst selectionMode = best.imageUrl ? 'image-rss-priority' : 'text-only-no-image-in-rss-pool';\nconst displayScore = Math.max(0, 200 - Math.round((best.ageHours || 0) * 20)) + (best.isCritical ? 30 : 0) + Math.min(20, (best.trendOverlap || 0) * 5) + (best.imageUrl ? 100 : 0);\nconst reservedLockKeys = lockCandidate(best, lockStore, now);\n\nreturn [{\n  json: {\n    ...best,\n    title: best.cleanTitle || best.title,\n    description: best.cleanDescription || best.description || '',\n    link: best.link,\n    canonicalUrl: best.canonicalUrl,\n    imageUrl: best.imageUrl,\n    source: best.source,\n    sourceLabel: best.sourceLabel,\n    category: best.isVeryCritical ? 'RSS Cok Kritik' : (best.isCritical ? 'RSS Kritik' : 'RSS Haber'),\n    eventKey: winner.key,\n    hash: best.hash,\n    trendScore: Math.round(displayScore),\n    matchedSources: winner.sources.join(', '),\n    matchedCount: winner.count,\n    selectionMode,\n    imageCandidateCount,\n    totalCandidateCount: candidates.length,\n    lockedCandidateCount,\n    reservedLockKeys: reservedLockKeys.join(', '),\n    trendsFresh,\n    trendSample: '',\n    nightNormalPostCount,\n    manualTestMode: IS_MANUAL_TEST,\n    quietWindowActive: !IS_MANUAL_TEST && isNightNow(),\n    selectedAt: new Date().toISOString(),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        15792
+      ],
+      "id": "4316a3a5-e086-41f6-978b-16dd761b875e",
+      "name": "Trend + Duplicate Filter",
+      "notes": "Gece filtresi aktif: 03:00-07:00 Europe/Istanbul production calismasinda sadece cok kritik haber. Manual/test bypass. Google Trends iptal."
+    },
+    {
+      "parameters": {
+        "numberInputs": 16
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3408,
+        15840
+      ],
+      "id": "197c6d88-3988-4e40-be29-0321c1567fa3",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://tr.investing.com/rss/central_banks.rss",
+        "options": {}
+      },
+      "id": "7380e446-d6b8-486d-8aa8-6711f57339db",
+      "name": "News RSS 03",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2192,
+        16032
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://onedio.com/Publisher/publisher-ekonomi.rss",
+        "options": {}
+      },
+      "id": "f969dc34-adc3-4317-9dab-743ef126501c",
+      "name": "News RSS 04",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2192,
+        16208
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Hash": "={{ $node[\"Trend + Duplicate Filter\"].json.hash }}",
+            "Baslik": "={{ $node[\"Trend + Duplicate Filter\"].json.title }}",
+            "Link": "={{ $node[\"Trend + Duplicate Filter\"].json.canonicalUrl || $node[\"Trend + Duplicate Filter\"].json.link }}",
+            "Kategori": "={{ $node[\"Article Image Enricher\"].json.category || $node[\"Trend + Duplicate Filter\"].json.category || \"RSS Haber\" }}",
+            "Trend Skoru": "={{ $node[\"Trend + Duplicate Filter\"].json.trendScore }}",
+            "Tweet Metni": "={{ $node[\"AI Agent1\"].json.output }}",
+            "Gorsel URL": "={{ $node[\"Article Image Enricher\"].json.imageUrl || $node[\"Trend + Duplicate Filter\"].json.imageUrl || \"\" }}",
+            "Yayinlanma Tarihi": "={{ $node[\"Trend + Duplicate Filter\"].json.selectedAt || $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Hash",
+              "displayName": "Hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Baslik",
+              "displayName": "Baslik",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Trend Skoru",
+              "displayName": "Trend Skoru",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tweet Metni",
+              "displayName": "Tweet Metni",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Gorsel URL",
+              "displayName": "Gorsel URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Yayinlanma Tarihi",
+              "displayName": "Yayinlanma Tarihi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3984,
+        16288
+      ],
+      "id": "8acf0458-96e0-48e9-8625-7217c2f6a8a8",
+      "name": "Log published in sheet",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3168,
+        16496
+      ],
+      "id": "0f990cab-cc9a-4b0a-beab-ce45da84e0fa",
+      "name": "Get row(s) in sheet",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.skynews.com/feeds/rss/world.xml",
+        "options": {}
+      },
+      "id": "82bb1585-2746-4e1a-b6b8-a1a455d82135",
+      "name": "News RSS 06",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2512,
+        15664
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.sozcu.com.tr/feeds-rss-category-ekonomi",
+        "options": {}
+      },
+      "id": "de1c0069-2c5c-424d-acc6-464ae533a739",
+      "name": "News RSS 07",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2512,
+        15856
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.mynet.com/haber/rss/sondakika",
+        "options": {}
+      },
+      "id": "7432b77b-bed7-45dc-81f8-93297957c46c",
+      "name": "News RSS 08",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2512,
+        16032
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "http://www.milliyet.com.tr/rss/rssNew/dunyaRss.xml",
+        "options": {}
+      },
+      "id": "498c75f5-9a85-432b-869e-48eaf1ee03bb",
+      "name": "News RSS 09",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2512,
+        16208
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.dunyatimes.com/rss_turkiye_1.xml",
+        "options": {}
+      },
+      "id": "61f4f81f-417d-4b70-8a18-c9bf3335e2b2",
+      "name": "News RSS 10",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2512,
+        16384
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.mynet.com/haber/rss/kategori/dunya/",
+        "options": {}
+      },
+      "id": "8a96c525-2edb-4955-868e-d6a704ec8a09",
+      "name": "News RSS 11",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2832,
+        15664
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://tr.investing.com/rss/news_289.rss",
+        "options": {}
+      },
+      "id": "cbaeb853-5290-458c-9f8a-cd1235dbe13e",
+      "name": "News RSS 12",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2832,
+        15856
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://www.sozcu.com.tr/feeds-rss-category-ekonomi",
+        "options": {}
+      },
+      "id": "d3e99349-ea34-4e9d-8a24-6960b12333cd",
+      "name": "News RSS 13",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2832,
+        16032
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://onedio.com/Publisher/publisher-gundem.rss",
+        "options": {}
+      },
+      "id": "721fd8c3-b85e-474a-b535-6f7e67898901",
+      "name": "News RSS 14",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2832,
+        16208
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.ekonomim.net/rss/genel-0",
+        "options": {}
+      },
+      "id": "98020f40-1ac7-4b73-a70b-2dbd300178ad",
+      "name": "News RSS 15",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2832,
+        16384
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "amount": "={{ ['manual', 'test'].includes(String($execution.mode || '')) ? 0 : Math.floor(Math.random() * 11) }}",
+        "unit": "minutes"
+      },
+      "id": "b4fd7502-3e59-4e21-ac89-c77633b1ed10",
+      "name": "Random Start Jitter 0-10m",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1728,
+        16320
+      ],
+      "notes": "Manual/test calistirmada 0 dk bekler. Aktif schedule calisirken 0-10 dk rastgele gecikme ekler."
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=%22son%20dakika%22%20when:6h&hl=tr&gl=TR&ceid=TR:tr",
+        "options": {}
+      },
+      "id": "ca6367bd-bb6e-463e-98c6-3c88b9b55187",
+      "name": "Google Trends TR RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        2832,
+        16560
+      ],
+      "disabled": true,
+      "continueOnFail": true,
+      "notes": "IPTAL: Google Trends/Google News haber kaynagi olarak kullanilmiyor. Logo/cop haber basmasin diye Merge baglantisi da kaldirildi."
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "id": "6226309f-2422-46a6-a1c2-e8c0d44bf14a",
+      "name": "Wait After Upload Once",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5008,
+        15792
+      ],
+      "notes": "PostPulse medya uploadindan sonra status READY olmasi icin 90 sn bekler."
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { skipped: true, reason: 'Media upload not READY; visual news was selected, so text-only fallback is disabled.', uploadState: $json.state || null, uploadId: $json.id || null, checkedAt: new Date().toISOString() } }];"
+      },
+      "id": "8d3c19aa-ab27-424c-b8e1-367617a4cec0",
+      "name": "Skip - Media Not Ready",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5104,
+        16192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.canonicalUrl || $json.link }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "51710d39-34b5-4681-9779-7dc618784ff4",
+      "name": "Fetch Article HTML for Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3824,
+        15744
+      ],
+      "continueOnFail": true,
+      "notes": "Secilen haber sayfasini acip og:image/twitter:image bulmak icin kullanilir. Hata verirse akisi durdurmaz."
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $node[\"Trend + Duplicate Filter\"].json || {};\nconst input = $input.first()?.json;\n\nfunction decode(value) {\n  return String(value || '')\n    .replace(/\\\\u0026/g, '&')\n    .replace(/\\\\u003d/g, '=')\n    .replace(/\\\\u002F/g, '/')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#34;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&apos;/g, \"'\")\n    .replace(/\\\\\"/g, '\"')\n    .trim();\n}\n\nfunction htmlFrom(value) {\n  if (!value) return '';\n  if (typeof value === 'string') return value;\n  const strings = [];\n  const seen = new Set();\n  function walk(v, depth = 0) {\n    if (depth > 4 || v == null) return;\n    if (typeof v === 'string') {\n      const s = v.trim();\n      if (s.length > 120 && !seen.has(s)) {\n        seen.add(s);\n        strings.push(s);\n      }\n      return;\n    }\n    if (Array.isArray(v)) return v.slice(0, 20).forEach(x => walk(x, depth + 1));\n    if (typeof v === 'object') Object.values(v).slice(0, 60).forEach(x => walk(x, depth + 1));\n  }\n  walk(value);\n  strings.sort((a, b) => {\n    const as = /og:image|twitter:image|<html|<meta/i.test(a) ? 1 : 0;\n    const bs = /og:image|twitter:image|<html|<meta/i.test(b) ? 1 : 0;\n    return bs - as || b.length - a.length;\n  });\n  return strings[0] || '';\n}\n\nfunction absoluteUrl(url, base) {\n  const raw = decode(url);\n  if (!raw) return '';\n  if (/^https?:\\/\\//i.test(raw)) return raw;\n  if (raw.startsWith('//')) return 'https:' + raw;\n  try { return new URL(raw, base || original.canonicalUrl || original.link || undefined).toString(); }\n  catch { return ''; }\n}\n\nfunction sourceDomainFromUrl(value) {\n  try { return new URL(String(value || '')).hostname.toLowerCase().replace(/^www\\./, ''); }\n  catch { return ''; }\n}\n\nfunction isBlockedGoogleNewsLink(value) {\n  const domain = sourceDomainFromUrl(value);\n  return domain.includes('news.google.') || domain.includes('trends.google.') || domain === 'google.com' || domain.endsWith('.google.com');\n}\n\nfunction looksBadImage(url) {\n  const lower = String(url || '').toLowerCase();\n  if (!/^https?:\\/\\//.test(lower)) return true;\n  if (/favicon|logo|sprite|avatar|profile|pixel|tracking|doubleclick|googletag|analytics|placeholder|default-image|google-news|news-google|\\.svg(?:\\?|$)/.test(lower)) return true;\n  if (/news\\.google\\.|googleusercontent\\.com|gstatic\\.com|google\\.com\\/images|google\\.com\\/logos|lh3\\.googleusercontent\\.com/.test(lower)) return true;\n  return false;\n}\n\nfunction scoreImage(url) {\n  const lower = String(url || '').toLowerCase();\n  let score = 0;\n  if (/\\.(jpe?g|png|webp|avif)(\\?|#|$)/.test(lower)) score += 70;\n  if (/og:image|twitter:image/.test(lower)) score += 10;\n  if (/i\\.guim\\.co\\.uk|media\\.guim\\.co\\.uk|static\\.guim\\.co\\.uk|image|images|media|photo|cdn|upload/.test(lower)) score += 35;\n  if (/(width|w)=([6-9]\\d{2}|[1-9]\\d{3,})/i.test(url)) score += 8;\n  if (/(height|h)=([3-9]\\d{2}|[1-9]\\d{3,})/i.test(url)) score += 6;\n  if (/\\/\\d{3,}x\\d{3,}\\//.test(url)) score += 8;\n  if (looksBadImage(url)) score -= 100;\n  return score;\n}\n\nfunction collectMetaImages(html) {\n  const text = String(html || '');\n  const found = [];\n  const patterns = [\n    /<meta\\b[^>]*(?:property|name)=[\"'](?:og:image(?::secure_url)?|twitter:image(?::src)?)[\"'][^>]*content=[\"']([^\"']+)[\"'][^>]*>/gi,\n    /<meta\\b[^>]*content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"'](?:og:image(?::secure_url)?|twitter:image(?::src)?)[\"'][^>]*>/gi,\n    /<link\\b[^>]*rel=[\"']image_src[\"'][^>]*href=[\"']([^\"']+)[\"'][^>]*>/gi,\n    /<link\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*rel=[\"']image_src[\"'][^>]*>/gi,\n    /\"image\"\\s*:\\s*\"(https?:\\\\?\\/\\\\?\\/[^\"\\\\]+)\"/gi,\n    /\"url\"\\s*:\\s*\"(https?:\\\\?\\/\\\\?\\/[^\"\\\\]+\\.(?:jpg|jpeg|png|webp|avif)(?:\\?[^\"\\\\]*)?)\"/gi\n  ];\n  for (const regex of patterns) {\n    let match;\n    while ((match = regex.exec(text)) !== null) {\n      const url = decode(match[1]).replace(/\\\\\\//g, '/');\n      if (url) found.push(url);\n      if (found.length > 30) break;\n    }\n  }\n  return found;\n}\n\nconst html = htmlFrom(input);\nconst base = original.canonicalUrl || original.link || '';\nif (isBlockedGoogleNewsLink(base)) {\n  return [{ json: { ...original, imageUrl: '', hasImage: false, imageSource: 'blocked-google-news-link', imageDebug: { blocked: true, reason: 'Google News link is radar-only, not publish media.' } } }];\n}\nconst rawRssImage = absoluteUrl(original.imageUrl || '', base);\nconst rssImage = rawRssImage && !looksBadImage(rawRssImage) ? rawRssImage : '';\nconst articleImages = collectMetaImages(html)\n  .map(url => absoluteUrl(url, base))\n  .filter(url => url && !looksBadImage(url));\nconst unique = [...new Set([rssImage, ...articleImages].filter(Boolean))];\nunique.sort((a, b) => scoreImage(b) - scoreImage(a));\nconst imageUrl = unique[0] || '';\n\nreturn [{ json: {\n  ...original,\n  imageUrl,\n  hasImage: Boolean(imageUrl),\n  articleImageUrl: imageUrl && imageUrl !== rssImage ? imageUrl : '',\n  imageSource: imageUrl ? (imageUrl === rssImage ? 'rss' : 'article-og') : 'none',\n  imageDebug: {\n    rssImage: rssImage || '',\n    articleImageCount: articleImages.length,\n    bestScore: imageUrl ? scoreImage(imageUrl) : 0\n  }\n}}];"
+      },
+      "id": "a879caf8-a1fd-4da7-89f9-10e13fc0425f",
+      "name": "Article Image Enricher",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4048,
+        15760
+      ],
+      "notes": "RSS icinde imageUrl yoksa haber sayfasindaki og:image/twitter:image/link image_src alanlarindan gorsel cikarir."
+    },
+    {
+      "parameters": {
+        "url": "https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Bottom+Menu/Diger/RSS",
+        "options": {}
+      },
+      "id": "fe9c0cb0-32a1-45c7-9236-f27a0a4c33bb",
+      "name": "News RSS 02",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2192,
+        15856
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://www.ekonomim.net/rss/gundem-1",
+        "options": {}
+      },
+      "id": "232588d0-eaab-4906-9d13-00f6d25a4ea9",
+      "name": "News RSS 05",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        2192,
+        16384
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Format Market Post": {
+      "main": [
+        [
+          {
+            "node": "Publish Market Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Market Post": {
+      "main": [
+        [
+          {
+            "node": "Log Market Post in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get published rows for YouTube": {
+      "main": [
+        [
+          {
+            "node": "Merge YouTube + Sheet",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge YouTube + Sheet": {
+      "main": [
+        [
+          {
+            "node": "YouTube Duplicate Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Duplicate Filter": {
+      "main": [
+        [
+          {
+            "node": "Publish YouTube Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish YouTube Post": {
+      "main": [
+        [
+          {
+            "node": "Log YouTube Post in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market API - Truncgil Finans": {
+      "main": [
+        [
+          {
+            "node": "Merge Market Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market API - Bitcoin USD": {
+      "main": [
+        [
+          {
+            "node": "Merge Market Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Market Data": {
+      "main": [
+        [
+          {
+            "node": "Format Market Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ZankaTV YouTube Videos Page": {
+      "main": [
+        [
+          {
+            "node": "Merge YouTube + Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ZankaTV YouTube Streams Page": {
+      "main": [
+        [
+          {
+            "node": "Merge YouTube + Sheet",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "ZankaTV YouTube Channel Feed": {
+      "main": [
+        [
+          {
+            "node": "Merge YouTube + Sheet",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Random Start Jitter 0-10m",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 15
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Trend + Duplicate Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trend + Duplicate Filter": {
+      "main": [
+        [
+          {
+            "node": "Fetch Article HTML for Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Media Check IF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Check IF1": {
+      "main": [
+        [
+          {
+            "node": "Upload media1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish Post (text only)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload media1": {
+      "main": [
+        [
+          {
+            "node": "Wait After Upload Once",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Post1": {
+      "main": [
+        [
+          {
+            "node": "Log published in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Post (text only)1": {
+      "main": [
+        [
+          {
+            "node": "Log published in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News RSS 01": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News RSS 03": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "News RSS 04": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "News RSS 06": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "News RSS 07": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "News RSS 08": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "News RSS 09": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 8
+          }
+        ]
+      ]
+    },
+    "News RSS 10": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 9
+          }
+        ]
+      ]
+    },
+    "News RSS 11": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 10
+          }
+        ]
+      ]
+    },
+    "News RSS 12": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 11
+          }
+        ]
+      ]
+    },
+    "News RSS 13": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 12
+          }
+        ]
+      ]
+    },
+    "News RSS 14": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 13
+          }
+        ]
+      ]
+    },
+    "News RSS 15": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 14
+          }
+        ]
+      ]
+    },
+    "Random Start Jitter 0-10m": {
+      "main": [
+        [
+          {
+            "node": "News RSS 01",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 03",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 04",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 06",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 07",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 08",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 09",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 10",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 11",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 12",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 13",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 14",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 15",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ZankaTV YouTube Channel Feed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ZankaTV YouTube Videos Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ZankaTV YouTube Streams Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get published rows for YouTube",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 02",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News RSS 05",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait After Upload Once": {
+      "main": [
+        [
+          {
+            "node": "Get upload status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get upload status1": {
+      "main": [
+        [
+          {
+            "node": "Upload Ready IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Ready IF": {
+      "main": [
+        [
+          {
+            "node": "Publish Post1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip - Media Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Article HTML for Image": {
+      "main": [
+        [
+          {
+            "node": "Article Image Enricher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Article Image Enricher": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Market Schedule 08:00 TR": {
+      "main": [
+        [
+          {
+            "node": "Market API - Truncgil Finans",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Market API - Bitcoin USD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News RSS 02": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "News RSS 05": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
